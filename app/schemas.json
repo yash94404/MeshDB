@@ -1,0 +1,89 @@
+{
+    "postgres": {
+        "movies": [
+            [
+                "id",
+                "integer"
+            ],
+            [
+                "runtime",
+                "integer"
+            ],
+            [
+                "imdb_rating",
+                "numeric"
+            ],
+            [
+                "meta_score",
+                "integer"
+            ],
+            [
+                "gross",
+                "numeric"
+            ],
+            [
+                "no_of_votes",
+                "integer"
+            ],
+            [
+                "release_year",
+                "integer"
+            ],
+            [
+                "title",
+                "character varying"
+            ],
+            [
+                "overview",
+                "text"
+            ],
+            [
+                "description",
+                "text"
+            ],
+            [
+                "certificate",
+                "character varying"
+            ],
+            [
+                "poster_link",
+                "text"
+            ]
+        ],
+        "genres": [
+            [
+                "id",
+                "integer"
+            ],
+            [
+                "name",
+                "character varying"
+            ]
+        ],
+        "movie_genres": [
+            [
+                "movie_id",
+                "integer"
+            ],
+            [
+                "genre_id",
+                "integer"
+            ]
+        ]
+    },
+    "neo4j": {
+        "nodes": {
+            "('Movie',)": [
+                "title",
+                "id"
+            ],
+            "('Person',)": [
+                "name"
+            ]
+        },
+        "relationships": {
+            "ACTED_IN": [],
+            "DIRECTED": []
+        }
+    }
+}

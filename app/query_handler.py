@@ -69,8 +69,10 @@ class DatabaseConfig:
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
 class QueryParser:
     """Handles natural language parsing using GPT-4 to generate database queries directly"""
-    def __init__(self, config: DatabaseConfig):
+    def __init__(self, config: DatabaseConfig, schema):
         self.client = AsyncOpenAI(api_key=config.openai_api_key)
+        self.postgres_schema = schema["postgres"]
+        self.neo4j_schema = schema["neo4j"]
         
     async def parse_query(self, natural_language_query: str, error_feedback: str = "") -> Dict:
         """Generate database-specific queries directly from natural language"""
@@ -133,38 +135,10 @@ class QueryParser:
             
             DATABASE SCHEMA:
             PostgreSQL Tables:
-            movies (
-                id INTEGER PRIMARY KEY,  # Use 'id', never 'movie_id'
-                title TEXT,
-                release_year INTEGER,
-                certificate TEXT,
-                runtime INTEGER,
-                imdb_rating FLOAT,
-                meta_score INTEGER,
-                overview TEXT,
-                gross BIGINT,
-                no_of_votes INTEGER,
-                poster_link TEXT
-            )
-            
-            genres (
-                id INTEGER PRIMARY KEY,  # Use 'id', never 'genre_id'
-                name TEXT
-            )
-            
-            movie_genres (
-                movie_id INTEGER,  # References movies.id
-                genre_id INTEGER   # References genres.id
-            )
+            {self.postgres_schema}
             
             Neo4j Structure:
-            Nodes:
-            - Movie (id, title)
-            - Person (id, name)
-            
-            Relationships:
-            - (Person)-[DIRECTED]->(Movie)
-            - (Person)-[ACTED_IN]->(Movie)
+            {self.neo4j_schema}
 
             EXAMPLE QUERIES:
 
@@ -429,11 +403,21 @@ class NLMDQA:
     """Main class for Natural Language Multi-Database Query Agent"""
     def __init__(self):
         self.config = DatabaseConfig()
-        self.parser = QueryParser(self.config)
+        self.schema = NLMDQA.load_schema_from_file("schemas.json")
+        self.parser = QueryParser(self.config, self.schema)
         self.connector = DatabaseConnector(self.config)
         self.executor = QueryExecutor(self.connector)
         self.merger = DataMerger()
         self.cache_manager = CacheManager()
+    
+    def load_schema_from_file(filename):
+        """
+        Load the schema dictionary from a JSON file.
+        """
+        with open(filename, 'r') as f:
+            schema = json.load(f)
+        print(f"Schema loaded from {filename}")
+        return schema
     
     async def generate_human_response(self, query: str, results: List[Dict]) -> str:
         """Generate a human-readable response using GPT"""
