@@ -1,5 +1,25 @@
 {
     "postgres": {
+        "genres": [
+            [
+                "id",
+                "integer"
+            ],
+            [
+                "name",
+                "character varying"
+            ]
+        ],
+        "movie_genres": [
+            [
+                "movie_id",
+                "integer"
+            ],
+            [
+                "genre_id",
+                "integer"
+            ]
+        ],
         "movies": [
             [
                 "id",
@@ -49,41 +69,10 @@
                 "poster_link",
                 "text"
             ]
-        ],
-        "genres": [
-            [
-                "id",
-                "integer"
-            ],
-            [
-                "name",
-                "character varying"
-            ]
-        ],
-        "movie_genres": [
-            [
-                "movie_id",
-                "integer"
-            ],
-            [
-                "genre_id",
-                "integer"
-            ]
         ]
     },
     "neo4j": {
-        "nodes": {
-            "('Movie',)": [
-                "title",
-                "id"
-            ],
-            "('Person',)": [
-                "name"
-            ]
-        },
-        "relationships": {
-            "ACTED_IN": [],
-            "DIRECTED": []
-        }
+        "nodes": {},
+        "relationships": {}
     }
 }

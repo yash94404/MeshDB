@@ -6,6 +6,29 @@ from typing import Dict
 from dotenv import load_dotenv
 import json
 
+
+def create_postgres_database(db_name, user, password, host, port):
+    conn = psycopg2.connect(
+        dbname="postgres",  # Connect to the default database
+        user=user,
+        password=password,
+        host=host,
+        port=port
+    )
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute(f"CREATE DATABASE {db_name};")
+    conn.close()
+    print(f"PostgreSQL database '{db_name}' created.")
+
+
+def create_neo4j_database(database_name):
+    subprocess.run(
+        ["neo4j-admin", "database", "create", database_name],
+        check=True
+    )
+    print(f"Neo4j database '{database_name}' created.")
+
 def restore_postgres_dump(dump_file: str, db_config: Dict):
     """
     Restore a PostgreSQL dump file.
@@ -174,7 +197,7 @@ def main():
     pg_dump_file = "dumps/movies_db.dump"  # Replace with actual dump file path
     neo4j_dump_file = "dumps"  # Replace with actual dump file path
 
-    restore_postgres_dump(pg_dump_file, pg_config)
+    #restore_postgres_dump(pg_dump_file, pg_config)
     restore_neo4j_dump(neo4j_dump_file, neo4j_config)
 
     # Infer schemas
