@@ -1,217 +1,151 @@
-import os
-import subprocess
 import psycopg2
+import subprocess
 from neo4j import GraphDatabase
-from typing import Dict
+import os
 from dotenv import load_dotenv
-import json
 
-def restore_postgres_dump(dump_file: str, db_config: Dict):
+# Load environment variables
+load_dotenv()
+
+PG_DATABASE = os.getenv("PG_DATABASE")
+PG_USER = os.getenv("PG_USER")
+PG_PASSWORD = os.getenv("PG_PASSWORD")
+PG_HOST = os.getenv("PG_HOST")
+PG_PORT = int(os.getenv("PG_PORT"))
+
+NEO4J_URI = os.getenv("NEO4J_URI")
+NEO4J_USER = os.getenv("NEO4J_USER")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
+
+PG_DUMP_FILE = "dumps/movies_db.dump"  # Replace with the actual path
+NEO4J_DUMP_PATH = "dumps"  # Replace with the actual path
+NEO4J_DATABASE_NAME = "neo4j"
+'''
+def create_postgres_database(db_name):
+    conn = psycopg2.connect(
+        dbname="postgres", user=PG_USER, password=PG_PASSWORD, host=PG_HOST, port=PG_PORT
+    )
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute(f"CREATE DATABASE {db_name};")
+    conn.close()
+    print(f"PostgreSQL database '{db_name}' created.")
+'''
+
+def create_postgres_database(db_name):
     """
-    Restore a PostgreSQL dump file.
+    Drops the PostgreSQL database if it exists, then recreates it.
     """
-    print(f"Restoring PostgreSQL dump from {dump_file}...")
+    conn = psycopg2.connect(
+        dbname="postgres", user=PG_USER, password=PG_PASSWORD, host=PG_HOST, port=PG_PORT
+    )
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        # Drop the database if it exists
+        cur.execute(f"SELECT 1 FROM pg_database WHERE datname = '{db_name}';")
+        if cur.fetchone():
+            cur.execute(f"DROP DATABASE {db_name};")
+            print(f"Database '{db_name}' dropped.")
+        # Create the database
+        cur.execute(f"CREATE DATABASE {db_name};")
+        print(f"Database '{db_name}' created.")
+    conn.close()
+
+
+def restore_postgres_dump(db_name, dump_file):
     restore_cmd = [
         "pg_restore",
-        "--clean",
-        "--if-exists",
-        "--no-owner",
-        "--dbname", f"postgresql://{db_config['user']}:{db_config['password']}@{db_config['host']}:{db_config['port']}/{db_config['database']}",
+        "-U", PG_USER,
+        "-h", PG_HOST,
+        "-p", str(PG_PORT),
+        "-d", db_name,
         dump_file
     ]
     subprocess.run(restore_cmd, check=True)
-    print("PostgreSQL restoration completed.")
+    print(f"PostgreSQL dump restored to '{db_name}'.")
 
-def infer_postgres_schema(conn):
-    """
-    Infer schema from the restored PostgreSQL database.
-    """
-    print("Inferring PostgreSQL schema...")
-    schema = {}
-    with conn.cursor() as cur:
-        # Get tables
-        cur.execute("""
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_schema = 'public'
-        """)
-        tables = cur.fetchall()
-        for table in tables:
-            table_name = table[0]
-            schema[table_name] = []
-            # Get columns for each table
-            cur.execute(f"""
-                SELECT column_name, data_type 
-                FROM information_schema.columns 
-                WHERE table_name = '{table_name}'
-            """)
-            schema[table_name] = cur.fetchall()
-    print("PostgreSQL schema inference completed.")
-    return schema
-
-def restore_neo4j_dump(dump_file: str, neo4j_config: Dict):
-    """
-    Restores a Neo4j database from a dump file.
-    """
-    print(f"Restoring Neo4j database from {dump_file}...")
-    restore_cmd = [
+def create_neo4j_database(database_name):
+    create_cmd = [
         "neo4j-admin",
         "database",
-        "load",
-        neo4j_config["database"],  # The database name, e.g., 'neo4j'
-        "--from-path", dump_file,  # Path to the dump
-        "--overwrite-destination=true"
+        "create",
+        database_name
     ]
+    subprocess.run(create_cmd, check=True)
+    print(f"Neo4j database '{database_name}' created.")
+
+NEO4J_ADMIN_PATH = "neo4j-admin"  # Ensure this is in your PATH or provide full path
+
+def stop_neo4j():
+    """
+    Stops the Neo4j server.
+    """
+    try:
+        print("Stopping Neo4j...")
+        subprocess.run(["sudo", "systemctl", "stop", "neo4j"], check=True)
+        print("Neo4j stopped.")
+    except subprocess.CalledProcessError:
+        print("Failed to stop Neo4j. Ensure the service is running and you have the necessary permissions.")
+        raise
+
+def start_neo4j():
+    """
+    Starts the Neo4j server.
+    """
+    try:
+        print("Starting Neo4j...")
+        subprocess.run(["sudo", "systemctl", "start", "neo4j"], check=True)
+        print("Neo4j started.")
+    except subprocess.CalledProcessError:
+        print("Failed to start Neo4j. Ensure the service is installed and you have the necessary permissions.")
+        raise
+
+def restore_neo4j_dump(dump_path, database_name):
+    """
+    Restores a Neo4j dump into the specified database.
+    """
+    try:
+        print(f"Restoring Neo4j dump from '{dump_path}' into '{database_name}'...")
+        restore_cmd = [
+            NEO4J_ADMIN_PATH,
+            "database",
+            "load",
+            database_name,
+            "--from-path", dump_path,
+            "--overwrite-destination=true"
+        ]
+        subprocess.run(restore_cmd, check=True)
+        print("Neo4j dump restored successfully.")
+    except subprocess.CalledProcessError:
+        print("Failed to restore Neo4j dump.")
+        raise
+    
+def main():
+    pg_db_name = PG_DATABASE
+    neo4j_db_name = "neo4j_movies_instance"
 
     try:
-        subprocess.run(restore_cmd, check=True)
-        print("Neo4j database restored successfully.")
-    except subprocess.CalledProcessError as e:
-        print(f"Error restoring Neo4j database: {e}")
+        # Step 1: Create PostgreSQL Database
+        create_postgres_database(pg_db_name)
 
+        # Step 2: Restore PostgreSQL Dump
+        restore_postgres_dump(pg_db_name, PG_DUMP_FILE)
 
-def infer_neo4j_schema(neo4j_driver):
-    """
-    Infers the schema of the Neo4j database without APOC.
-    """
-    print("Inferring Neo4j schema...")
-    schema = {"nodes": {}, "relationships": {}}
-    with neo4j_driver.session() as session:
-        # Get node labels and properties
-        node_result = session.run("""
-            MATCH (n)
-            RETURN DISTINCT labels(n) AS labels, keys(n) AS properties
-        """)
-        for record in node_result:
-            labels = tuple(record["labels"])
-            properties = record["properties"]
-            schema["nodes"][labels] = properties
-        
-        # Get relationship types and properties
-        rel_result = session.run("""
-            MATCH ()-[r]->()
-            RETURN DISTINCT type(r) AS relationshipType, keys(r) AS properties
-        """)
-        for record in rel_result:
-            rel_type = record["relationshipType"]
-            properties = record["properties"]
-            schema["relationships"][rel_type] = properties
+        # Step 3: Create Neo4j Database
+        #create_neo4j_database(neo4j_db_name)
 
-    print("Neo4j schema inference completed.")
-    return schema
+        # Step 4: Restore Neo4j Dump
+        stop_neo4j()
 
+        # Step 2: Restore the Neo4j dump
+        restore_neo4j_dump(NEO4J_DUMP_PATH, NEO4J_DATABASE_NAME)
 
+        # Step 3: Start Neo4j server
+        start_neo4j()
 
-def infer_property_type(value):
-    if isinstance(value, int):
-        return "INTEGER"
-    elif isinstance(value, float):
-        return "FLOAT"
-    elif isinstance(value, str):
-        return "STRING"
-    elif isinstance(value, bool):
-        return "BOOLEAN"
-    elif value is None:
-        return "NULL"
-    else:
-        return "UNKNOWN"
-
-
-def convert_keys_to_str(data):
-    """
-    Recursively convert dictionary keys to strings for JSON compatibility.
-    """
-    if isinstance(data, dict):
-        return {str(key): convert_keys_to_str(value) for key, value in data.items()}
-    elif isinstance(data, list):
-        return [convert_keys_to_str(item) for item in data]
-    else:
-        return data
-    
-def save_schema_to_file(schema, filename):
-    """
-    Save the schema dictionary to a JSON file.
-    """
-    schema_str_keys = convert_keys_to_str(schema)
-    with open(filename, 'w') as f:
-        json.dump(schema_str_keys, f, indent=4)
-    print(f"Schema saved to {filename}")
-
-
-def main():
-    load_dotenv()
-
-    # Configuration
-    pg_config = {
-        "database": os.getenv("PG_DATABASE"),
-        "user": os.getenv("PG_USER"),
-        "password": os.getenv("PG_PASSWORD"),
-        "host": os.getenv("PG_HOST"),
-        "port": os.getenv("PG_PORT"),
-    }
-    neo4j_config = {
-        "uri": os.getenv("NEO4J_URI"),
-        "user": os.getenv("NEO4J_USER"),
-        "password": os.getenv("NEO4J_PASSWORD"),
-        "database": "neo4j"  # Default Neo4j database
-    }
-
-    # Database connections
-    pg_conn = psycopg2.connect(
-        dbname=pg_config["database"],
-        user=pg_config["user"],
-        password=pg_config["password"],
-        host=pg_config["host"],
-        port=pg_config["port"]
-    )
-
-    neo4j_driver = GraphDatabase.driver(
-        neo4j_config["uri"],
-        auth=(neo4j_config["user"], neo4j_config["password"])
-    )
-
-    # Restore databases
-    pg_dump_file = "dumps/movies_db.dump"  # Replace with actual dump file path
-    neo4j_dump_file = "dumps"  # Replace with actual dump file path
-
-    restore_postgres_dump(pg_dump_file, pg_config)
-    restore_neo4j_dump(neo4j_dump_file, neo4j_config)
-
-    # Infer schemas
-    postgres_schema = infer_postgres_schema(pg_conn)
-    neo4j_schema = infer_neo4j_schema(neo4j_driver)
-
-    # Output schemas
-    print("PostgreSQL Schema:")
-    for table, columns in postgres_schema.items():
-        print(f"Table: {table}")
-        for column, data_type in columns:
-            print(f"  {column}: {data_type}")
-
-    print("\nNeo4j Schema:")
-    print("Nodes:")
-    print(neo4j_schema["nodes"])
-    for label, properties in neo4j_schema["nodes"].items():
-        print(f"Label: {label}")
-        for property_name in properties:
-            print(f"  {property_name}")
-    print("Relationships:")
-    for rel_type, properties in neo4j_schema["relationships"].items():
-        print(f"Type: {rel_type}")
-        for property_name, data_type in properties:
-            print(f"  {property_name}: {data_type}")
-    
-    combined_schema = {
-        "postgres": postgres_schema,
-        "neo4j": neo4j_schema
-    }
-
-    # Save schemas to a JSON file
-    save_schema_to_file(combined_schema, "schemas.json")
-
-    # Close connections
-    pg_conn.close()
-    neo4j_driver.close()
+        print("Pipeline completed successfully!")
+    except Exception as e:
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
     main()
