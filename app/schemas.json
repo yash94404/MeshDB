@@ -85,5 +85,23 @@
             "ACTED_IN": [],
             "DIRECTED": []
         }
+    },
+    "mongodb": {
+        "movies": {
+            "_id": "ObjectId",
+            "title": "str",
+            "release_year": "int",
+            "certificate": "str",
+            "runtime": "int",
+            "imdb_rating": "float",
+            "meta_score": "int",
+            "overview": "str",
+            "gross": "float",
+            "no_of_votes": "int",
+            "poster_link": "str",
+            "genres": "list",
+            "director": "str",
+            "stars": "list"
+        }
     }
 }

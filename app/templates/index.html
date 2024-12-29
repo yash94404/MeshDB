@@ -63,10 +63,13 @@
     <h2>Upload Database Dumps</h2>
     <form id="uploadForm" method="POST" enctype="multipart/form-data" action="/upload-dumps">
         <label for="pg_dump">PostgreSQL Dump:</label>
-        <input type="file" id="pg_dump" name="pg_dump" required>
+        <input type="file" id="pg_dump" name="pg_dump">
 
         <label for="neo4j_dump">Neo4j Dump:</label>
-        <input type="file" id="neo4j_dump" name="neo4j_dump" required>
+        <input type="file" id="neo4j_dump" name="neo4j_dump">
+
+        <label for="mongo_dump">MongoDB Dump:</label>
+        <input type="file" id="mongo_dump" name="mongo_dump">
 
         <button type="submit">Upload and Restore</button>
     </form>

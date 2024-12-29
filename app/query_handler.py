@@ -1,7 +1,3 @@
-# Natural Language Multi-Database Query Agent (NLMDQA)
-# Required packages:
-# pip install openai python-dotenv pymongo psycopg2-binary neo4j redis
-
 import os
 from typing import Dict, List, Any, Union
 from openai import AsyncOpenAI
@@ -73,6 +69,7 @@ class QueryParser:
         self.client = AsyncOpenAI(api_key=config.openai_api_key)
         self.postgres_schema = schema["postgres"]
         self.neo4j_schema = schema["neo4j"]
+        self.mongo_schema = schema["mongodb"]
         
     async def parse_query(self, natural_language_query: str, error_feedback: str = "") -> Dict:
         """Generate database-specific queries directly from natural language"""
@@ -80,7 +77,7 @@ class QueryParser:
             error_context = f"""
             PREVIOUS ERROR FEEDBACK:
             {error_feedback}
-            
+
             Please fix any issues mentioned above in the generated query.
             """ if error_feedback else ""
 
@@ -89,9 +86,9 @@ class QueryParser:
 
             Convert the following natural language query into a pipeline of database queries.
             You can create multi-stage queries where results from one query feed into another.
-            
+
             Natural Language Query: {natural_language_query}
-            
+
             GENERAL RULES FOR QUERY GENERATION:
             1. Only use multiple stages when you need to:
             - Query across different databases
@@ -111,7 +108,7 @@ class QueryParser:
             4. Always qualify column names with table aliases (e.g., m.id, g.name)
             5. Use meaningful table aliases (e.g., m for movies, g for genres)
             6. Include ORDER BY in the same query when doing aggregations
-            
+
             NEO4J RULES:
             1. Always use different variable names for relationships and nodes
             2. Never reuse the same variable name in a pattern
@@ -120,7 +117,7 @@ class QueryParser:
             5. For multiple values from previous stages, use:
             Good: WHERE x.id IN [{{previous_stage1.ids}}]
             Bad: WITH [{{previous_stage1.ids}}] as ids ... // Never do this!
-            
+
             NEO4J QUERY PATTERNS:
             1. For counting/aggregation:
             MATCH (node1:Label1)-[r1:REL]->(node2:Label2)
@@ -132,13 +129,48 @@ class QueryParser:
             MATCH (node1:Label1)-[r1:REL]->(node2:Label2)-[r2:REL]->(node3:Label3)
             WHERE node1.id IN [{{previous_stage1.ids}}]
             RETURN DISTINCT node3.id as id
-            
+
+            MONGODB RULES:
+            1. Use MongoDB's JSON-style query syntax for filtering.
+            2. Include aggregation stages in a single query using the `$match`, `$group`, and `$sort` operators when applicable.
+            3. Always specify the `collection` and the `filter` for each MongoDB stage.
+            4. Use `$in` for filtering multiple values from previous stages.
+            5. For computed fields or aggregations, use `$project` and `$addFields`.
+            6. Always include an `output_keys` array specifying the fields needed for subsequent stages.
+
+            MONGODB QUERY PATTERNS:
+            1. For simple filtering:
+            {{
+                "collection": "movies",
+                "filter": {{"imdb_rating": {{"$gt": 8.0}}, "genres": "Action"}}
+            }}
+
+            2. For aggregations:
+            {{
+                "collection": "movies",
+                "filter": [
+                    {{"$match": {{"genres": "Action", "imdb_rating": {{"$gt": 8.0}}}}}},
+                    {{"$group": {{"_id": "$release_year", "average_rating": {{"$avg": "$imdb_rating"}}}}}},
+                    {{"$sort": {{"average_rating": -1}}}}
+                ]
+            }}
+
+            3. For cross-database filtering:
+            Use `$in` in the filter with IDs from previous stages:
+            {{
+                "collection": "movies",
+                "filter": {{"id": {{"$in": ["{{previous_stage1.ids}}"]}}}}
+            }}
+
             DATABASE SCHEMA:
             PostgreSQL Tables:
             {self.postgres_schema}
-            
+
             Neo4j Structure:
             {self.neo4j_schema}
+
+            MongoDB Collections:
+            {self.mongo_schema}
 
             EXAMPLE QUERIES:
 
@@ -147,16 +179,10 @@ class QueryParser:
                 "pipeline": [
                     {{
                         "stage": 1,
-                        "database": "postgresql",
+                        "database": "mongodb",
                         "query": {{
-                            "postgresql": "
-                                SELECT DISTINCT m.id, m.title, m.imdb_rating, m.release_year 
-                                FROM movies m
-                                JOIN movie_genres mg ON m.id = mg.movie_id
-                                JOIN genres g ON g.id = mg.genre_id
-                                WHERE g.name = 'Action'
-                                AND m.imdb_rating > 8.0
-                                ORDER BY m.imdb_rating DESC"
+                            "collection": "movies",
+                            "filter": {{"imdb_rating": {{"$gt": 8.0}}, "genres": "Action"}}
                         }},
                         "output_keys": ["id", "title", "imdb_rating", "release_year"],
                         "description": "Get high-rated action movies"
@@ -198,14 +224,10 @@ class QueryParser:
                     }},
                     {{
                         "stage": 2,
-                        "database": "postgresql",
+                        "database": "mongodb",
                         "query": {{
-                            "postgresql": "
-                                SELECT m.id, m.title, m.release_year, m.gross
-                                FROM movies m
-                                WHERE m.id IN {{previous_stage1.id}}
-                                AND m.gross > 100000000
-                                ORDER BY m.gross DESC"
+                            "collection": "movies",
+                            "filter": {{"id": {{"$in": [{{previous_stage1.ids}}]}}, "gross": {{"$gt": 100000000}}}}
                         }},
                         "output_keys": ["id", "title", "release_year", "gross"],
                         "description": "Get high-grossing movies from the director"
@@ -215,11 +237,12 @@ class QueryParser:
 
             Return ONLY a JSON object containing a pipeline array of stages. Each stage must have:
             - stage: number indicating order
-            - database: which database to query ("postgresql" or "neo4j")
+            - database: which database to query ("postgresql", "neo4j", or "mongodb")
             - query: object with database-specific query
-            - output_keys: array of column names to pass to next stage
+            - output_keys: array of column names to pass to the next stage
             - description: string explaining what the stage does
             """
+
             
             response = await self.client.chat.completions.create(
                 model="gpt-4",
