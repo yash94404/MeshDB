@@ -403,7 +403,7 @@ class NLMDQA:
     """Main class for Natural Language Multi-Database Query Agent"""
     def __init__(self):
         self.config = DatabaseConfig()
-        self.schema = NLMDQA.load_schema_from_file("schemas.json")
+        self.schema = NLMDQA.load_schema_from_file("app/schemas.json")
         self.parser = QueryParser(self.config, self.schema)
         self.connector = DatabaseConnector(self.config)
         self.executor = QueryExecutor(self.connector)
