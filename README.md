@@ -1,49 +1,47 @@
-How to run the code:
+# **NLMDQA: Natural Language Multi-Database Query Agent**
 
-1. Install the requirements:
+NLMDQA is a system that enables natural language queries across multiple database systems, including **PostgreSQL**, **Neo4j**, and **MongoDB**. It dynamically generates multi-stage query pipelines, integrating SQL, Cypher, and NoSQL queries to provide seamless cross-database analytics.
 
-```
-pip install -r requirements.txt
-```
+---
 
-2. Setup postgres and neo4j databases, and add data to databases
+## **Features**
+- **Multi-Database Query Support**: Execute natural language queries across PostgreSQL, Neo4j, and MongoDB.
+- **Dynamic Query Pipeline**: Uses GPT-4 to generate multi-stage pipelines for cross-database queries.
+- **Schema Inference**: Automatically infers database schemas and saves them in a unified JSON format.
+- **Query Optimization**: Handles multi-stage queries with dynamic placeholder resolution.
+- **REST API**: Provides endpoints for database dump uploads and query execution.
+- **Caching**: Accelerates repeated queries using Redis-based caching.
 
-Add keys in .env file for Postgres and Neo4j connection, as well as the openAI key.
+---
 
-Here were the names/values I used:
+## **Technologies Used**
+- **Databases**:
+  - PostgreSQL: Relational database for structured data.
+  - Neo4j: Graph database for relationship-heavy queries.
+  - MongoDB: NoSQL database for flexible document storage.
+- **Backend**:
+  - Flask: Python web framework for API endpoints.
+  - psycopg2: PostgreSQL driver.
+  - neo4j: Neo4j Python driver.
+  - pymongo: MongoDB driver.
+- **AI Integration**:
+  - OpenAI GPT-4: Converts natural language into database-specific queries.
+- **Other Tools**:
+  - Redis: Query result caching.
+  - Docker: Containerization for deployment.
 
-PG_DATABASE=movies_db
+---
 
-PG_USER=movies_user
+## **Setup Instructions**
 
-PG_PASSWORD=movies123
+### **Prerequisites**
+- Python 3.8+
+- PostgreSQL, Neo4j, and MongoDB installed and running.
+- Redis server installed and running.
+- OpenAI API key.
 
-PG_HOST=localhost
-
-PG_PORT=5432
-
-NEO4J_URI=bolt://localhost:7687
-
-NEO4J_USER=neo4j
-
-NEO4J_PASSWORD=movies123
-
-Make sure both the postgres and neo4j instances are running and configured properly, and run the following code to create the tables and add the data to the tables from movies.csv:
-
-```
-python data_import.py
-```
-
-3. Substitute the query in the `main()` function with the query you want to try
-
-4. Run the code:
-
-```
-python main.py
-```
-
-5. Run the code with human-readable output:
-
-```
-python main.py -hr
-```
+### **Installation**
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-repo/nlmdqa.git
+   cd nlmdqa
