@@ -1,6 +1,6 @@
-# **NLMDQA: Natural Language Multi-Database Query Agent**
+# **MeshDB: Natural Language Multi-Database Query Agent**
 
-NLMDQA is a system that enables natural language queries across multiple database systems, including **PostgreSQL**, **Neo4j**, and **MongoDB**. It dynamically generates multi-stage query pipelines, integrating SQL, Cypher, and NoSQL queries to provide seamless cross-database analytics.
+MeshDB is a system that enables natural language queries across multiple database systems, including **PostgreSQL**, **Neo4j**, and **MongoDB**. It dynamically generates multi-stage query pipelines, integrating SQL, Cypher, and NoSQL queries to provide seamless cross-database analytics.
 
 ---
 
