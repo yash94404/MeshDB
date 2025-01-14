@@ -179,10 +179,16 @@ class QueryParser:
                 "pipeline": [
                     {{
                         "stage": 1,
-                        "database": "mongodb",
+                        "database": "postgresql",
                         "query": {{
-                            "collection": "movies",
-                            "filter": {{"imdb_rating": {{"$gt": 8.0}}, "genres": "Action"}}
+                            "postgresql": "
+                                SELECT DISTINCT m.id, m.title, m.imdb_rating, m.release_year 
+                                FROM movies m
+                                JOIN movie_genres mg ON m.id = mg.movie_id
+                                JOIN genres g ON g.id = mg.genre_id
+                                WHERE g.name = 'Action'
+                                AND m.imdb_rating > 8.0
+                                ORDER BY m.imdb_rating DESC"
                         }},
                         "output_keys": ["id", "title", "imdb_rating", "release_year"],
                         "description": "Get high-rated action movies"
@@ -224,10 +230,14 @@ class QueryParser:
                     }},
                     {{
                         "stage": 2,
-                        "database": "mongodb",
+                        "database": "postgresql",
                         "query": {{
-                            "collection": "movies",
-                            "filter": {{"id": {{"$in": [{{previous_stage1.ids}}]}}, "gross": {{"$gt": 100000000}}}}
+                            "postgresql": "
+                                SELECT m.id, m.title, m.release_year, m.gross
+                                FROM movies m
+                                WHERE m.id IN {{previous_stage1.id}}
+                                AND m.gross > 100000000
+                                ORDER BY m.gross DESC"
                         }},
                         "output_keys": ["id", "title", "release_year", "gross"],
                         "description": "Get high-grossing movies from the director"
