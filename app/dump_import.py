@@ -5,6 +5,7 @@ from neo4j import GraphDatabase
 from typing import Dict
 from dotenv import load_dotenv
 import json
+from pymongo import MongoClient
 
 def restore_postgres_dump(dump_file: str, db_config: Dict):
     """
@@ -101,6 +102,46 @@ def infer_neo4j_schema(neo4j_driver):
     return schema
 
 
+def restore_mongodb_dump(dump_folder: str, mongo_uri: str, database_name: str):
+    """
+    Restore a MongoDB dump from a folder.
+    """
+    print(f"Restoring MongoDB dump from {dump_folder}...")
+
+    client = MongoClient(mongo_uri)
+    db = client[database_name]
+    db.drop_collection("movies")
+    
+    restore_cmd = [
+        "mongorestore",
+        "--uri", mongo_uri,
+        "--db", database_name,
+        dump_folder
+    ]
+    subprocess.run(restore_cmd, check=True)
+    print("MongoDB restoration completed.")
+
+def infer_mongodb_schema(mongo_uri: str, database_name: str):
+    """
+    Infer the schema of collections in the MongoDB database.
+    """
+    print("Inferring MongoDB schema...")
+    schema = {}
+    client = MongoClient(mongo_uri)
+    db = client[database_name]
+
+    for collection_name in db.list_collection_names():
+        collection = db[collection_name]
+        sample_doc = collection.find_one()
+        if sample_doc:
+            schema[collection_name] = {key: type(value).__name__ for key, value in sample_doc.items()}
+        else:
+            schema[collection_name] = "Empty Collection"
+
+    client.close()
+    print("MongoDB schema inference completed.")
+    return schema
+
 
 def infer_property_type(value):
     if isinstance(value, int):
@@ -155,6 +196,10 @@ def main():
         "password": os.getenv("NEO4J_PASSWORD"),
         "database": "neo4j"  # Default Neo4j database
     }
+    mongo_config = {
+        "uri": os.getenv("MONGO_URI"),
+        "database": os.getenv("MONGO_DATABASE")
+    }
 
     # Database connections
     pg_conn = psycopg2.connect(
@@ -170,48 +215,67 @@ def main():
         auth=(neo4j_config["user"], neo4j_config["password"])
     )
 
-    # Restore databases
-    pg_dump_file = "dumps/movies_db.dump"  # Replace with actual dump file path
-    neo4j_dump_file = "dumps"  # Replace with actual dump file path
+    try:
+        # Restore PostgreSQL
+        pg_dump_file = "dumps/movies_db.dump"  # Replace with actual dump file path
+        restore_postgres_dump(pg_dump_file, pg_config)
 
-    restore_postgres_dump(pg_dump_file, pg_config)
-    restore_neo4j_dump(neo4j_dump_file, neo4j_config)
+        # Restore Neo4j
+        neo4j_dump_file = "dumps"  # Replace with actual dump file path
+        restore_neo4j_dump(neo4j_dump_file, neo4j_config)
 
-    # Infer schemas
-    postgres_schema = infer_postgres_schema(pg_conn)
-    neo4j_schema = infer_neo4j_schema(neo4j_driver)
+        # Restore MongoDB
+        mongo_dump_folder = "dumps"  # Replace with actual MongoDB dump folder path
+        restore_mongodb_dump(mongo_dump_folder, mongo_config["uri"], mongo_config["database"])
 
-    # Output schemas
-    print("PostgreSQL Schema:")
-    for table, columns in postgres_schema.items():
-        print(f"Table: {table}")
-        for column, data_type in columns:
-            print(f"  {column}: {data_type}")
+        # Infer schemas
+        postgres_schema = infer_postgres_schema(pg_conn)
+        neo4j_schema = infer_neo4j_schema(neo4j_driver)
+        mongo_schema = infer_mongodb_schema(mongo_config["uri"], mongo_config["database"])
 
-    print("\nNeo4j Schema:")
-    print("Nodes:")
-    print(neo4j_schema["nodes"])
-    for label, properties in neo4j_schema["nodes"].items():
-        print(f"Label: {label}")
-        for property_name in properties:
-            print(f"  {property_name}")
-    print("Relationships:")
-    for rel_type, properties in neo4j_schema["relationships"].items():
-        print(f"Type: {rel_type}")
-        for property_name, data_type in properties:
-            print(f"  {property_name}: {data_type}")
-    
-    combined_schema = {
-        "postgres": postgres_schema,
-        "neo4j": neo4j_schema
-    }
+        # Combine schemas
+        combined_schema = {
+            "postgres": postgres_schema,
+            "neo4j": neo4j_schema,
+            "mongodb": mongo_schema
+        }
 
-    # Save schemas to a JSON file
-    save_schema_to_file(combined_schema, "schemas.json")
+        # Output schemas
+        print("\nPostgreSQL Schema:")
+        for table, columns in postgres_schema.items():
+            print(f"Table: {table}")
+            for column, data_type in columns:
+                print(f"  {column}: {data_type}")
 
-    # Close connections
-    pg_conn.close()
-    neo4j_driver.close()
+        print("\nNeo4j Schema:")
+        print("Nodes:")
+        for label, properties in neo4j_schema["nodes"].items():
+            print(f"Label: {label}")
+            for property_name in properties:
+                print(f"  {property_name}")
+        print("Relationships:")
+        for rel_type, properties in neo4j_schema["relationships"].items():
+            print(f"Type: {rel_type}")
+            for property_name in properties:
+                print(f"  {property_name}")
+
+        print("\nMongoDB Schema:")
+        for collection, fields in mongo_schema.items():
+            print(f"Collection: {collection}")
+            for field, data_type in fields.items():
+                print(f"  {field}: {data_type}")
+
+        # Save combined schemas to JSON file
+        save_schema_to_file(combined_schema, "schemas.json")
+
+    except Exception as e:
+        print(f"Error during processing: {e}")
+
+    finally:
+        # Close connections
+        pg_conn.close()
+        neo4j_driver.close()
 
 if __name__ == "__main__":
     main()
+
