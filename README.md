@@ -43,5 +43,5 @@ MeshDB is a system that enables natural language queries across multiple databas
 ### **Installation**
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-repo/nlmdqa.git
-   cd nlmdqa
+   git clone [https://github.com/yash94404/MeshDB.git]
+   cd MeshDB
