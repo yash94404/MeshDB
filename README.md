@@ -43,5 +43,9 @@ MeshDB is a system that enables natural language queries across multiple databas
 ### **Installation**
 1. Clone the repository:
    ```bash
-   git clone [https://github.com/yash94404/MeshDB.git]
+   git clone https://github.com/yash94404/MeshDB.git
    cd MeshDB
+2. Run frontend module and navigate to http://127.0.0.1:5000
+   ```bash
+   python3 run.py
+   
